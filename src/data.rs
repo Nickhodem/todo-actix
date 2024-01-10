@@ -1,9 +1,9 @@
 use std::sync::{Arc, Mutex};
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use chrono::prelude::*;
+use serde::{Serialize, Deserialize};
 
 #[derive(Deserialize, Serialize, Clone)]
-pub struct ToDo{
+pub struct Todo {
     pub id: Option<String>,
     pub title: String,
     pub description: String,
@@ -11,18 +11,19 @@ pub struct ToDo{
     pub create_time: Option<DateTime<Utc>>
 }
 
-pub struct QueryOptions{
-    pub completed: bool,
+pub struct AppState {
+    pub todos: Arc<Mutex<Vec<Todo>>>
 }
 
-pub struct AppState{
-    pub todos: Arc<Mutex<Vec<ToDo>>>,
-}
-
-impl AppState{
-    pub fn new() -> AppState{
-        Self{
+impl AppState {
+    pub fn new() -> AppState {
+        Self {
             todos: Arc::new(Mutex::new(Vec::new()))
         }
+    }
 }
+
+#[derive(Deserialize)]
+pub struct QueryOptions {
+    pub completed: bool
 }

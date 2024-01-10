@@ -1,49 +1,45 @@
-use actix_web::{get, HttpResponse, post, web};
-use actix_web::web::ServiceConfig;
-use uuid::Uuid;
-use crate::data::{AppState, ToDo};
-use chrono::Utc;
+use std::arch::asm;
+use std::io::Cursor;
 
-#[post("/todos")]
-async fn create(mut todo: web::Json<ToDo>, app_state: web::Data<AppState>) -> HttpResponse{
+use chrono::Utc;
+use rocket::{get, post, Response, State};
+use rocket::http::Status;
+use rocket::response::status;
+use rocket::response::status::NotFound;
+use rocket::serde::json::Json;
+use uuid::Uuid;
+
+use crate::data::{AppState, Todo};
+
+#[post("/todos", data = "<todo>")]
+pub async fn create(mut todo: Json<Todo>, app_state: &State<AppState>) -> Result<Json<Todo>, String> {
     let id = Uuid::new_v4().to_string();
     todo.id = Some(id.clone());
     todo.create_time = Some(Utc::now());
     todo.completed = Some(false);
 
-    if let Ok(mut todos) = app_state.todos.lock(){
-        todos.push(todo.clone());
-    }
+    if let Ok(mut todos) = app_state.todos.lock() {
+        todos.push(todo.clone().into_inner());
+    };
 
-    HttpResponse::Created()
-        .append_header(("Location", format!("http://localhost::8080/api/todos{}", id)))
-        .json(todo)
+    Ok(Json(todo.into_inner()))
 }
 
-#[get("/todos/{id}")]
-async fn get_by_id(path: web::Path<String>, app_state: web::Data<AppState>) -> HttpResponse{
-    let id = Some(path.to_string());
-    if let Ok(todos) = app_state.todos.lock(){
-        let todo = todos.iter()
-            .find(|todo| todo.id == id);
-
-        if todo.is_some() {
-            HttpResponse::Ok().json(todo.unwrap())
-        }
-        else {
-            HttpResponse::NotFound().finish()
-        }
-    }
-    else{
-        HttpResponse::InternalServerError().finish()
-    }
-
+#[get("/todos/<id>")]
+pub async fn get_by_id(id: String, app_state: &State<AppState>) -> Result<Json<Todo>, NotFound<()>> {
+    app_state.todos.lock()
+        .map(|todos| todos.clone().into_iter().find(|todo| todo.id == Some(id.clone())))
+        .map(|todo| if todo.is_none() { Err(NotFound(())) } else { Ok(Json(todo.unwrap())) })
+        .map_err(|_| Status::InternalServerError )
+        .unwrap()
 }
 
-pub fn config(config: &mut web::ServiceConfig){
-    let scope = web::scope("/api")
-        .service(create)
-        .service(get_by_id);
-
-    config.service(scope);
+#[get("/todos?<completed>")]
+pub async fn get_all(completed: bool, app_state: &State<AppState>) -> Result<Json<Vec<Todo>>, NotFound<()>> {
+    if let Ok(todos) = app_state.todos.lock() {
+        let active_todos: Vec<Todo> = todos.clone().into_iter().filter(|todo| todo.completed == Some(completed)).collect();
+        Ok(Json(active_todos))
+    } else {
+        Err(NotFound(()))
+    }
 }
