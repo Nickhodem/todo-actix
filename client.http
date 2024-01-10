@@ -1,0 +1,16 @@
+POST http://localhost:8080/api/todos
+ACCEPT: application/json
+Content-Type: application/json
+
+{
+  "title": "Poznac rusta",
+  "description": "trudna sprawa"
+}
+
+
+###
+
+
+GET http://localhost:8080/api/todos/b08e3872-f191-4c23-b304-0e98761dd25a
+ACCEPT: application/json
+Content-Type: application/json
